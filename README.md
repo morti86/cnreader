@@ -6,6 +6,7 @@ A desktop app that helps reading Chinese texts. you can:
 - ask Chat GPT / Deepseek about the meaning or usage examples with just one click
 - listen to pronounciation
 - convert traditional to simplified
+- look for a word in your local Anki database
 
 To compile it use: cargo build --release
 
