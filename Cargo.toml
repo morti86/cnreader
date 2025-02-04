@@ -1,0 +1,28 @@
+[package]
+name = "cnreader"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+regex = "1.11.*"
+serde = { version = "1.0.*", features=["derive"] }
+toml = "0.8.19"
+elevenlabs_rs = "0.3.2"
+anyhow = "1.0.*"
+rayon = "1.10.0"
+iced = { version = "0.13.1", features=["tokio"] }
+deepl = "0.6.5"
+paddleocr_rs = "0.1.1"
+image = "0.25.*"
+rfd = "0.15.2"
+openai = "1.0.0-alpha.18"
+tokio = "^1.40.*"
+rusqlite = "0.33.0"
+chrono = "0.4.*"
+shellexpand = "3.1.0"
+
+[target.'cfg(target_family = "unix")'.dependencies]
+wl-clipboard-rs = "*"
+
+[target.'cfg(target_family = "windows")'.dependencies]
+clipboard-win = "5.4.0"

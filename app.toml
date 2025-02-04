@@ -1,0 +1,59 @@
+ocr_models = "/mnt/var/models/"
+openai_model = "gpt-4"
+deepseek_model = "deepseek-chat"
+
+deepseek = "https://api.deepseek.com"
+gpt = "https://api.openai.com/v1"
+
+ollama_url = ""
+ollama_port = 1000
+
+voice = "Mimi"
+
+# The location of Anki database
+anki = "~/.var/app/net.ankiweb.Anki/data/Anki2/User 1/collection.anki2"
+
+[api_keys]
+openai = ""
+deepl = ""
+elevenlabs = ""
+deepseek = ""
+
+[window]
+w = 850
+h = 800
+# Language, look at labels for supported values
+lang = "eng"
+font = "Source Han Serif CN"
+# Theme, available values are:
+# 	Light (default), Dark, Dracula, Nord, SolarizedLight, SolarizedDark, GruvboxLight, 
+#       GruvboxDark, CatppuccinLatte, CatppuccinFrappe, CatppuccinMacchiato, 
+#       CatppuccinMocha, TokyoNight, TokyoNightStorm, TokyoNightLight, KanagawaWave, 
+#       KanagawaDragon, KanagawaLotus, Moonfly, Nightfly, Oxocarbon, Ferra
+theme = "TokyoNight"
+padding = 10
+# Font size
+font_size = 18.0
+
+# Labels
+default = "-"
+ids_ocr = { pol = "OCR", eng = "OCR" }
+ids_ocr_file = { pol = "OCR Pliku", eng = "OCR File" }
+ids_gpt = { pol = "GPT", eng = "GPT" }
+ids_deepseek = { pol = "Deepseek", eng = "Deepseek" }
+ids_meaning = { pol = "Znaczenie", eng = "Meaning" }
+ids_examples = { pol = "Przykłady", eng = "Examples" }
+ids_deepl = { pol = "Deepl", eng = "Deepl" }
+ids_play = { pol = "Odtwarzaj", eng = "Play" }
+ids_to_sim = { pol = "Uproszczone", eng = "Simplified" }
+ids_anki = { pol = "Anki", eng = "Anki" }
+
+ids_s_openai_key = { pol = "Klucz API Openai", eng = "Openai API key" }
+
+er_no_word_sel = { pol = "Nie zaznaczono słowa", eng = "No word selected" }
+er_no_chat_sel = { pol = "Nie wybrano chatu", eng = "No chat selected" }
+er_no_file = { pol = "Nie znaleziono pliku", eng = "No file found" }
+
+[questions]
+meaning = { pol = "Wytłumacz znaczenie i użycie słowa: ", eng = "Explain the meaning and the usage of the word: " }
+examples = { pol = "Podaj kilka przykładowych zdań ze słowem: ", eng = "Give a few example sentences with the word: " }
