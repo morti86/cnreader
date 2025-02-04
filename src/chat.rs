@@ -7,6 +7,12 @@ use anyhow::{Result, anyhow};
 use paddleocr_rs;
 use image;
 use elevenlabs_rs::*;
+use ollama_rs::{
+    generation::completion::{
+        request::GenerationRequest,
+    },
+    Ollama,
+};
 
 #[derive(Copy, Debug, Clone)]
 pub enum Question {
@@ -18,6 +24,7 @@ pub enum Question {
 pub enum Chat {
     Openai,
     Deepseek,
+    Ollama,
 }
 
 impl std::fmt::Display for Chat {
@@ -25,6 +32,7 @@ impl std::fmt::Display for Chat {
         f.write_str(match self {
             Self::Openai => "Openai",
             Self::Deepseek => "Deepseek",
+            Self::Ollama => "Ollama",
         })
     }
 }
@@ -34,8 +42,9 @@ pub async fn ask_gpt_a(q: Question, ch: Chat, config: Arc<crate::config::Config>
     let key = match ch {
         Chat::Openai => config.api_keys.openai.as_str(),
         Chat::Deepseek => config.api_keys.deepseek.as_str(),
+        Chat::Ollama => "",
     };
-    let url = match ch { Chat::Openai => config.gpt.as_str(), Chat::Deepseek => config.deepseek.as_str() };
+    let url = match ch { Chat::Openai => config.gpt.as_str(), Chat::Deepseek => config.deepseek.as_str(), _ => "", };
     let c = Credentials::new(key, url);
     let question = match q {
         Question::Meaning => config.questions.meaning.get( config.window.lang.as_str() ).unwrap().as_str(),
@@ -53,6 +62,7 @@ pub async fn ask_gpt_a(q: Question, ch: Chat, config: Arc<crate::config::Config>
      let model = match ch {
          Chat::Openai => config.openai_model.as_str(),
          Chat::Deepseek => config.deepseek_model.as_str(),
+         _ => "",
      };
 
      let chat_completion = ChatCompletion::builder(model, messages.clone())
@@ -65,6 +75,23 @@ pub async fn ask_gpt_a(q: Question, ch: Chat, config: Arc<crate::config::Config>
 
      content
 
+}
+
+pub async fn ask_ollama(q: Question, config: Arc<crate::config::Config>, w: Arc<String>) -> String {
+    let ollama = Ollama::new(config.ollama_url.as_str(), config.ollama_port);
+    let question = match q {
+        Question::Meaning => config.questions.meaning.get( config.window.lang.as_str() ).unwrap().as_str(),
+        Question::Examples => config.questions.examples.get( config.window.lang.as_str() ).unwrap().as_str(),
+    };
+
+    let prompt = format!("{} {}", question, w.as_str());
+
+    let res = ollama.generate(GenerationRequest::new(config.ollama_model.to_owned(), prompt)).await;
+
+    match res {
+        Ok(res) => res.response,
+        Err(e) => e.to_string(),
+    }
 }
 
 pub async fn ask_deepl_a(question: Arc<String>, conf: Arc<crate::config::Config>) -> Result<deepl::TranslateTextResp, deepl::Error> {

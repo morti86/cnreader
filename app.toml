@@ -5,8 +5,9 @@ deepseek_model = "deepseek-chat"
 deepseek = "https://api.deepseek.com"
 gpt = "https://api.openai.com/v1"
 
-ollama_url = ""
-ollama_port = 1000
+ollama_url = "http://localhost"
+ollama_port = 11434
+ollama_model = "deepseek-r1:32b"
 
 voice = "Mimi"
 

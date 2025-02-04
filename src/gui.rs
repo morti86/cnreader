@@ -68,8 +68,6 @@ pub enum Message {
     AiSelected(chat::Chat),
     ToSimplified,
     ShowAnki,
-    HideAnki,
-    AnkiEditAction(text_editor::Action),
 }
 
 pub struct Reader {
@@ -85,9 +83,6 @@ pub struct Reader {
 
     ai_states: combo_box::State<chat::Chat>,
     ai: Option<chat::Chat>,
-
-    anki_c: String,
-    anki_res: text_editor::Content,
 }
 
 impl Default for Reader {
@@ -179,10 +174,8 @@ impl Reader {
             show_anki: false,
             modal_text: String::new(),
             ai: None,
-            ai_states: combo_box::State::new(vec![chat::Chat::Openai, chat::Chat::Deepseek]),
+            ai_states: combo_box::State::new(vec![chat::Chat::Openai, chat::Chat::Deepseek, chat::Chat::Ollama]),
             anki,
-            anki_c: String::new(),
-            anki_res: text_editor::Content::new(),
         }
     }
 
@@ -278,15 +271,6 @@ impl Reader {
                 ).width(w).height(h).padding(10).align_x(iced::Alignment::Center).align_y(iced::Alignment::Center);
 
             alert.into()
-        } else if self.show_anki {
-            let anki = container(
-                column![
-                    text(self.anki_c.as_str()),
-                    text_editor(&self.anki_res).height(h*0.85).on_action(Message::AnkiEditAction),
-                    button("OK").on_press(Message::HideAnki)
-                ].align_x(iced::Alignment::Center)
-            );
-            anki.into()
         } else {
             controls.into()
         }
@@ -342,6 +326,12 @@ impl Reader {
                     let sel = Arc::new(s);
 
                     match self.ai {
+                        Some(chat::Chat::Ollama) => {
+                            return iced::Task::perform(
+                                chat::ask_ollama(chat::Question::Meaning, config, sel),
+                                |e| { Message::ChatResult(Arc::new(e)) }
+                            )
+                        },
                         Some(ai) => {
                             return iced::Task::perform(
                                 chat::ask_gpt_a(chat::Question::Meaning, ai, config, sel),
@@ -365,6 +355,12 @@ impl Reader {
                     let sel = Arc::new(s);
 
                     match self.ai {
+                        Some(chat::Chat::Ollama) => {
+                            return iced::Task::perform(
+                                chat::ask_ollama(chat::Question::Examples, config, sel),
+                                |e| { Message::ChatResult(Arc::new(e)) }
+                            )
+                        },
                         Some(ai) => {
                             return iced::Task::perform(
                                 chat::ask_gpt_a(chat::Question::Examples, ai, config, sel),
@@ -466,35 +462,17 @@ impl Reader {
             },
             Message::ShowAnki => {
                 let s = self.text.selection();
-                self.anki_c.clear();
-                self.anki_res = text_editor::Content::new();
+                self.result = text_editor::Content::new();
                 match &s {
                     Some(s) => {
-                        self.anki_c = s.to_owned();
                         let r = self.anki.search(s.as_str()).unwrap_or(vec![]);
-                        r.iter().for_each(|rl| self.anki_res.perform( text_editor::Action::Edit( text_editor::Edit::Paste( Arc::new(format!("-\t{}{}", rl.trim(), "\n") ))) ));
-                        self.show_anki = true;
+                        r.iter().for_each(|rl| self.result.perform( text_editor::Action::Edit( text_editor::Edit::Paste( Arc::new(format!("-\t{}{}", rl.trim(), "\n") ))) ));
                     },
                     None => {
-                        self.anki_c.clear();
+                        return iced::Task::none();
                     },
                 }
                 iced::Task::none()
-            },
-            Message::HideAnki => {
-                self.show_anki = false;
-                iced::Task::none()
-            },
-            Message::AnkiEditAction(a) => {
-                match a {
-                    text_editor::Action::Scroll{..} | text_editor::Action::Select(_) | text_editor::Action::Click(_) => {
-                       self.anki_res.perform(a);
-                       iced::Task::none()
-                    },
-                    _ => {
-                        iced::Task::none()
-                    }
-                }
             },
         }
     }

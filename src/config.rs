@@ -110,6 +110,10 @@ pub struct Config {
     pub gpt: String,
     pub anki: String,
 
+    pub ollama_url: String,
+    pub ollama_port: u16,
+    pub ollama_model: String,
+
     pub questions: ChatQuestions,
     #[serde(with = "PreMadeVoiceIDDef")]
     pub voice: PreMadeVoiceID,
