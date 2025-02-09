@@ -19,7 +19,7 @@ use clipboard_win::{formats, get_clipboard};
 
 #[cfg(target_family="windows")]
 fn get_image() -> Vec<u8> {
-    if let Ok(x) = clipboard_win::get_clipboard(formats::RawData) {
+    if let Ok(x) = get_clipboard(formats::Bitmap) {
         return x
     }
     vec![]
