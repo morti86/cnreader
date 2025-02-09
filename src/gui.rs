@@ -4,6 +4,7 @@ use iced::Element;
 use crate::config;
 use crate::anki;
 use crate::cedict;
+use std::io::Read;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
@@ -18,7 +19,7 @@ use clipboard_win::{formats, get_clipboard};
 
 #[cfg(target_family="windows")]
 fn get_image() -> Vec<u8> {
-    if let Ok(x) = get_clipboard(formats::Bitmap) {
+    if let Ok(x) = clipboard_win::get_clipboard(formats::RawData) {
         return x
     }
     vec![]
@@ -105,57 +106,19 @@ macro_rules! get_label {
     }
 }
 
-macro_rules! init_application {
-    ($th:expr, $($theme:ident),+) => {
-        {
-            match $th {
-                $(
-                    stringify!($theme) => {
-                        iced::application("Reader", Reader::update, Reader::view)
-                            .theme(|_| iced::Theme::$theme)
-                            .run()
-                    },
-                )+
-                _ => {
-                    iced::application("Reader", Reader::update, Reader::view)
-                            .theme(|_| iced::Theme::Light)
-                            .run()
-
-                },
-            }
-        }
-    };
-    ($th:expr, $title:literal, $($theme:ident),+) => {
-        {
-            match $th {
-                $(
-                    stringify!($theme) => {
-                        iced::application($title, Reader::update, Reader::view)
-                            .theme(|_| iced::Theme::$theme)
-                            .run()
-                    },
-                )+
-                _ => {
-                    iced::application($title, Reader::update, Reader::view)
-                            .theme(|_| iced::Theme::Light)
-                            .run()
-
-                },
-            }
-        }
-    };
-
-}
 
 pub fn run(theme: &str) -> Result<(), iced::Error> {
-    init_application!(
-        theme, 
-            Light, Dark, Dracula, Nord, SolarizedLight, SolarizedDark, GruvboxLight, 
-            GruvboxDark, CatppuccinLatte, CatppuccinFrappe, CatppuccinMacchiato, 
-            CatppuccinMocha, TokyoNight, TokyoNightStorm, TokyoNightLight, KanagawaWave, 
-            KanagawaDragon, KanagawaLotus, Moonfly, Nightfly, Oxocarbon, Ferra)
+    for e in iced::Theme::ALL {
+        if theme.to_string() == e.to_string() {
+            return iced::application("Reader", Reader::update, Reader::view)
+                .theme(|_| e.clone())
+                .run();
+        }
+    }
+    iced::application("Reader", Reader::update, Reader::view)
+        .theme(|_| iced::Theme::Light)
+        .run()
 }
-
 
 impl Reader {
     const FNAME: &'static str = "cedict_1_0_ts_utf-8_mdbg.txt";

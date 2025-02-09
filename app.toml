@@ -31,7 +31,7 @@ font = "Source Han Serif CN"
 #       GruvboxDark, CatppuccinLatte, CatppuccinFrappe, CatppuccinMacchiato, 
 #       CatppuccinMocha, TokyoNight, TokyoNightStorm, TokyoNightLight, KanagawaWave, 
 #       KanagawaDragon, KanagawaLotus, Moonfly, Nightfly, Oxocarbon, Ferra
-theme = "TokyoNight"
+theme = "Tokyo Night"
 padding = 10
 # Font size
 font_size = 18.0
