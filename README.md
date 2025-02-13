@@ -10,4 +10,6 @@ A desktop app that helps reading Chinese texts. you can:
 
 To compile it use: cargo build --release
 
+Requirements: SQLite3 library
+
 For OCR models look at: https://huggingface.co/SWHL/RapidOCR/tree/main/PP-OCRv4
