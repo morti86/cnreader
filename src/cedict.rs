@@ -27,7 +27,7 @@ impl Entry {
 
 impl fmt::Display for Entry {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "- {} | {} [{}]\n\t- {}", self.sim, self.tra, self.pin, self.mea.replace("/","\n\t- "))
+        write!(f, "- {} | {} [{}]\n- {}", self.sim, self.tra, self.pin, self.mea.replace("/","\n- "))
     }
 }
 
@@ -65,11 +65,11 @@ impl Cedict {
     }
 
     pub fn characters(&self) -> Vec<&Entry> {
-        self.entries.iter().filter(|e| e.chr).collect()
+        self.entries.par_iter().filter(|e| e.chr).collect()
     }
 
     fn characters_filtered(&self, s: &str) -> Vec<&Entry> {
-        self.entries.iter().filter(|e| { e.chr && s.contains(e.tra.as_str()) }).collect()
+        self.entries.par_iter().filter(|e| { e.chr && s.contains(e.tra.as_str()) }).collect()
     }
 
     /// Search all containing
@@ -79,13 +79,13 @@ impl Cedict {
 
     /// Search exact match
     pub fn find(&self, s: &str) -> Vec<&Entry> {
-        self.entries.iter().filter(|e| { e.sim.as_str() == s || e.tra.as_str() == s }).collect()
+        self.entries.par_iter().filter(|e| { e.sim.as_str() == s || e.tra.as_str() == s }).collect()
     }
 
     /// Convert traditional to simplified
     pub fn to_sim(&self, s: &str) -> String {
         let chr_list = self.characters_filtered(s);
-        let ss = s.chars()
+        let ss = s.par_chars()
             .map(|z| {
                 let c = chr_list.iter().find(|x| x.tra == z.to_string());
                 match c {
