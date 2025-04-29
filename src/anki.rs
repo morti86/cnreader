@@ -1,35 +1,13 @@
 use rusqlite::Connection;
-use regex::Regex;
-use std::fmt;
-use chrono::DateTime;
-use anyhow::Result;
-use std::sync::Arc;
+use chrono::{DateTime, Utc};
+use std::collections::HashMap;
 
-#[derive(Clone)]
-pub struct WordsDates {
-    pub sim: String,
-    pub date_added: DateTime<chrono::Utc>,
-}
-
-impl WordsDates {
-    pub fn new(sim: String, ts: i64) -> Self {
-        Self {
-            sim,
-            date_added: DateTime::from_timestamp_millis(ts).unwrap()
-        }
-    }
-}
-
-impl fmt::Display for WordsDates {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(f, "{}\t{}", self.sim, self.date_added.format("%Y-%m-%d")  )
-    }
-}
+type Dupa<T> = Result<T, Box<dyn std::error::Error>>;
 
 #[derive(Clone, Debug)]
 pub enum Anki {
-    AnkiDb {conn: Arc<Connection>, pattern: Regex, flds_pattern: Regex},
-    None,
+    AnkiDb { data: HashMap<String, DateTime<Utc>> },
+    None
 }
 
 impl Anki {
@@ -37,20 +15,26 @@ impl Anki {
     pub const FLDS_PATTERN: &'static str = r"^(<div>)?(?P<key>[^<]+)(<\/div>)?\u{001F}(.+)<(div|br)>(?P<val>[^<\n]+)(<\/div>)?";
     pub const NO_ANKI: &'static str = "No Anki database found";
     pub fn new(fname: &str) -> Self {
-        match Connection::open_with_flags(fname, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY) {
-            Ok(c) => Self::AnkiDb {conn: Arc::new(c), pattern: Regex::new(Self::PATTERN).unwrap(), flds_pattern: Regex::new(Self::FLDS_PATTERN).unwrap(), },
-            _ => Self::None,
+        if let Ok(c) = Connection::open_with_flags(fname, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY) {
+            let mut st = c.prepare("SELECT REPLACE(sfld, CHAR(10), ' '),id FROM notes").unwrap();
+            let mut e_it = st.query([]).unwrap();
+            let mut data = HashMap::new();
+            println!("AAA");
+            while let Ok(e) = e_it.next() {
+                if let Some(e) = e {
+                    let word: String = e.get_unwrap(0);
+                    let ts: i64 = e.get_unwrap(1);
+                    let date = DateTime::from_timestamp_millis(ts).unwrap();
+                    data.insert(word, date);
+                } else {
+                    break;
+                }
+            }
+            Self::AnkiDb { data }
+        } else {
+            return Self::None
         }
-    }
 
-    fn clean_str<'b>(&self, s: &'b str) -> String {
-        match self {
-            Self::AnkiDb{ .. } => {
-                let c = s.replace("&nbsp;","");
-                c
-            },
-            Self::None => s.to_string(),
-        }
     }
 
     pub fn is_none(&self) -> bool {
@@ -67,39 +51,25 @@ impl Anki {
         }
     }
 
-    /// Checks if the base contains the given word
-    pub fn contains(&self, val: &str) -> Result<bool> {
+    pub fn contains(&self, key: &str) -> bool {
         match self {
-            Self::AnkiDb{ conn, .. } => {
-                let mut st = conn.prepare("SELECT REPLACE(sfld, CHAR(10), ' ') FROM notes WHERE REPLACE(sfld, CHAR(10), '') = ?")?;
-                let mut rows = st.query([val])?;
-                if let Some(_) = rows.next()? {
-                    return Ok(true);
-                }
-                anyhow::Ok(false)
-            },
-            Self::None => Err(anyhow::anyhow!(Self::NO_ANKI)),
+            Self::None => false,
+            Self::AnkiDb { data } => {
+                data.contains_key(key)
+            }
         }
     }
 
-    /// Searches for all the entries containing given word
-    pub fn search(&self, val: &str) -> Result<Vec<String>> {
+    pub fn search(&self, key: &str) -> Vec<&String> {
         match self {
-            Self::AnkiDb{ conn,.. } => {
-                let mut res = vec![];
-                let s = format!("%{val}%");
-                let mut st = conn.prepare("SELECT REPLACE(sfld, CHAR(10), ' ') FROM notes WHERE REPLACE(sfld, CHAR(10), '') LIKE ?")?;
-                let mut e_it = st.query([s])?;
-                while let Some(e) = e_it.next()? {
-                    res.push(e.get_unwrap(0));
-                }
-                Ok(res)
-            },
-            Self::None => Err(anyhow::anyhow!(Self::NO_ANKI)),
+            Self::None => vec![],
+            Self::AnkiDb { data } => {
+                data.keys()
+                    .filter(|&k| k.contains(key))
+                    .collect()
+            }
         }
     }
+
+
 }
-
-
-
-

@@ -10,6 +10,7 @@ pub struct Keys {
     pub deepl: String,
     pub deepseek: String,
     pub elevenlabs: String,
+    pub grok: String,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, Copy)]
@@ -67,6 +68,8 @@ pub struct Window {
     pub w: f32,
     pub h: f32,
     pub font_size: f32,
+    pub text_c_size: Option<f32>,
+    pub but_w: Option<f32>,
 
     pub lang: String,
     pub theme: String,
@@ -103,12 +106,14 @@ pub struct Config {
     pub ocr_models: String,
     pub openai_model: String,
     pub deepseek_model: String,
+    pub grok_model: String,
     pub api_keys: Keys,
     pub window: Window,
 
     pub deepseek: String,
     pub gpt: String,
     pub anki: String,
+    pub grok: String,
 
     pub ollama_url: String,
     pub ollama_port: u16,
@@ -117,5 +122,7 @@ pub struct Config {
     pub questions: ChatQuestions,
     #[serde(with = "PreMadeVoiceIDDef")]
     pub voice: PreMadeVoiceID,
+
+    pub rec_min_score: Option<f32>,
 }
 

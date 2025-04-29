@@ -2,7 +2,7 @@ use iced::widget::{button, column, row, text_editor, Button,
     text, stack, container, opaque, center, mouse_area, combo_box, ComboBox};
 use iced::Element;
 use crate::config;
-use crate::anki;
+use crate::anki::Anki;
 use crate::cedict;
 use std::io::Read;
 use std::fs;
@@ -19,7 +19,7 @@ use clipboard_win::{formats, get_clipboard};
 
 #[cfg(target_family="windows")]
 fn get_image() -> Vec<u8> {
-    if let Ok(x) = get_clipboard(formats::Bitmap) {
+    if let Ok(x) = clipboard_win::get_clipboard(formats::RawData) {
         return x
     }
     vec![]
@@ -34,21 +34,6 @@ fn get_image() -> Vec<u8> {
         return content
     }
     vec![]
-}
-
-#[derive(Debug, Clone)]
-pub enum AiEngine {
-    Openai,
-    Deepseek,
-}
-
-impl std::fmt::Display for AiEngine {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_str(match self {
-            Self::Openai => "Openai",
-            Self::Deepseek => "Deepseek",
-        })
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -68,6 +53,8 @@ pub enum Message {
     AiSelected(chat::Chat),
     ToSimplified,
     ShowAnki,
+    LoadFile,
+    SaveFile,
 }
 
 pub struct Reader {
@@ -75,7 +62,7 @@ pub struct Reader {
     result: text_editor::Content,
     config: Arc<config::Config>,
     cedict: cedict::Cedict,
-    anki: anki::Anki,
+    anki: Anki,
 
     show_modal: bool,
     show_anki: bool,
@@ -83,6 +70,8 @@ pub struct Reader {
 
     ai_states: combo_box::State<chat::Chat>,
     ai: Option<chat::Chat>,
+
+    is_html: bool,
 }
 
 impl Default for Reader {
@@ -116,7 +105,6 @@ pub fn run(theme: &str) -> Result<(), iced::Error> {
         }
     }
     iced::application("Reader", Reader::update, Reader::view)
-        .theme(|_| iced::Theme::Light)
         .run()
 }
 
@@ -126,7 +114,7 @@ impl Reader {
 
     pub fn new() -> Self {
         let conf: Arc<config::Config> = Arc::new(toml::from_str( fs::read_to_string( Self::CONFIG ).unwrap().as_str() ).unwrap());
-        let anki = anki::Anki::new(&*shellexpand::tilde(conf.anki.as_str()));
+        let anki = Anki::new(&*shellexpand::tilde(conf.anki.as_str()));
         Self {
             text: text_editor::Content::new(),
             result: text_editor::Content::new(), 
@@ -136,34 +124,23 @@ impl Reader {
             show_anki: false,
             modal_text: String::new(),
             ai: None,
-            ai_states: combo_box::State::new(vec![chat::Chat::Openai, chat::Chat::Deepseek, chat::Chat::Ollama]),
+            ai_states: combo_box::State::new(chat::Chat::ALL.to_vec()),
             anki,
+            is_html: false,
         }
     }
 
-    fn save_config(&mut self) {
-        let config = self.config.clone();
-        match  toml::to_string(config.as_ref()) {
-            Ok(_) => {},
-            Err(e) => {
-                self.display_av(e.to_string().as_str());
-            }
-        }
-
-    }
-    
     fn display_av(&mut self, msg: &str) {
         self.modal_text = msg.to_string();
         self.show_modal = true;
     }
 
     pub fn view(&self) -> Element<'_, Message> {
-        //let idsself.config.window.ids_ocr.get(self.lang)
-        //init_idc!(ids_ocr, idc_ocr, self.config, Message::Ocr, self.config.window.lang.as_str());
         let h = self.config.window.h;
         let w = self.config.window.w;
         let lang = self.config.window.lang.as_str();
         let font_size = self.config.window.font_size;
+        let but_w = self.config.window.but_w.unwrap_or(80.0);
 
         let idc_text: Element<'_, Message> = text_editor( &self.text )
             .placeholder("")
@@ -171,7 +148,8 @@ impl Reader {
             .height(h*0.50)
             .size(font_size)
             .into();
-
+        
+        let is_sel = self.text.selection().is_some();
         let idc_result: Element<'_, Message> = text_editor( &self.result )
             .placeholder("")
             .on_action(Message::ResultAction)
@@ -180,8 +158,8 @@ impl Reader {
             .into();
         let mut ocr_ex = false;      
         if Path::new(&format!("{}{}", self.config.ocr_models,"ch_PP-OCRv4_det_infer.onnx")).exists()
-            && Path::new(&format!("{}{}", self.config.ocr_models, "ch_PP-OCRv4_det_infer.onnx")).exists()
-            && Path::new(&format!("{}{}", self.config.ocr_models, "ch_PP-OCRv4_det_infer.onnx")).exists() {
+            && Path::new(&format!("{}{}", self.config.ocr_models, "ppocr_keys_v1.txt")).exists()
+            && Path::new(&format!("{}{}", self.config.ocr_models, "ch_PP-OCRv4_rec_infer.onnx")).exists() {
                 ocr_ex = true;
         }
 
@@ -196,8 +174,8 @@ impl Reader {
             init_button!(ids_deepl, lang, &self, Message::Deepl)
         };
 
-        let idc_meaning: Button<Message> = init_button!(ids_meaning, lang, &self, Message::ChatMeaning);
-        let idc_examples: Button<Message> = init_button!(ids_examples, lang, &self, Message::ChatExamples);
+        let idc_meaning: Button<Message> = if is_sel { init_button!(ids_meaning, lang, &self, Message::ChatMeaning).width(but_w) } else { init_button!(ids_meaning, lang, &self).width(but_w) };
+        let idc_examples: Button<Message> = if is_sel { init_button!(ids_examples, lang, &self, Message::ChatExamples).width(but_w) } else { init_button!(ids_examples, lang, &self).width(but_w) };
 
         let idc_play: Button<Message> = if self.config.api_keys.elevenlabs.is_empty() {
             init_button!(ids_play, lang, &self)
@@ -206,8 +184,8 @@ impl Reader {
         };
         let idc_to_simplified: Button<Message> = init_button!(ids_to_sim, lang, &self, Message::ToSimplified);
 
-        let idc_anki: Button<Message> = match self.anki {
-            anki::Anki::AnkiDb{..} => init_button!(ids_anki, lang, &self, Message::ShowAnki),
+        let idc_anki: Button<Message> = match (&self.anki, is_sel) {
+            (Anki::AnkiDb{..},true) => init_button!(ids_anki, lang, &self, Message::ShowAnki),
             _ => init_button!(ids_anki, lang, &self),
         };
 
@@ -304,6 +282,7 @@ impl Reader {
                     }
                 } else {
                     self.display_av( get_label!(er_no_word_sel, self.config.clone()) );
+                    
                 }
 
                 iced::Task::none()
@@ -427,13 +406,39 @@ impl Reader {
                 self.result = text_editor::Content::new();
                 match &s {
                     Some(s) => {
-                        let r = self.anki.search(s.as_str()).unwrap_or(vec![]);
+                        let r = self.anki.search(s.as_str());
                         r.iter().for_each(|rl| self.result.perform( text_editor::Action::Edit( text_editor::Edit::Paste( Arc::new(format!("-\t{}{}", rl.trim(), "\n") ))) ));
                     },
                     None => {
                         return iced::Task::none();
                     },
                 }
+                iced::Task::none()
+            },
+            Message::LoadFile => {
+                let file = rfd::FileDialog::new()
+                    .add_filter("text", &["txt"])
+                    .pick_file();
+                match file {
+                    Some(file) => {
+                        self.text = text_editor::Content::with_text("");
+                        let s = fs::read_to_string(file);
+                        match s {
+                            Ok(s) => {
+                                self.text = text_editor::Content::with_text(s.as_str());
+                            },
+                            Err(e) => self.display_av(e.to_string().as_str()),
+                        }
+                    },
+                    None => {
+                        return iced::Task::none();
+                    },
+                }
+                
+
+                iced::Task::none()
+            },
+            Message::SaveFile => {
                 iced::Task::none()
             },
         }
@@ -466,3 +471,4 @@ fn modal<'a, Message>(
     ]
     .into()
 }
+

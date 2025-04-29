@@ -8,9 +8,7 @@ use paddleocr_rs;
 use image;
 use elevenlabs_rs::*;
 use ollama_rs::{
-    generation::completion::{
-        request::GenerationRequest,
-    },
+    generation::completion::request::GenerationRequest,
     Ollama,
 };
 
@@ -25,6 +23,7 @@ pub enum Chat {
     Openai,
     Deepseek,
     Ollama,
+    Grok,
 }
 
 impl std::fmt::Display for Chat {
@@ -33,8 +32,13 @@ impl std::fmt::Display for Chat {
             Self::Openai => "Openai",
             Self::Deepseek => "Deepseek",
             Self::Ollama => "Ollama",
+            Self::Grok => "Grok",
         })
     }
+}
+
+impl Chat {
+    pub const ALL: &'static [Self] = &[Self::Openai, Self::Deepseek, Self::Ollama, Self::Grok];
 }
 
 // Sends a request to Chat GPT/Deepseek
@@ -43,8 +47,9 @@ pub async fn ask_gpt_a(q: Question, ch: Chat, config: Arc<crate::config::Config>
         Chat::Openai => config.api_keys.openai.as_str(),
         Chat::Deepseek => config.api_keys.deepseek.as_str(),
         Chat::Ollama => "",
-    };
-    let url = match ch { Chat::Openai => config.gpt.as_str(), Chat::Deepseek => config.deepseek.as_str(), _ => "", };
+        Chat::Grok => config.api_keys.grok.as_str(),
+        };
+    let url = match ch { Chat::Openai => config.gpt.as_str(), Chat::Deepseek => config.deepseek.as_str(), Chat::Grok => config.grok.as_str(), _ => "" };
     let c = Credentials::new(key, url);
     let question = match q {
         Question::Meaning => config.questions.meaning.get( config.window.lang.as_str() ).unwrap().as_str(),
@@ -62,6 +67,7 @@ pub async fn ask_gpt_a(q: Question, ch: Chat, config: Arc<crate::config::Config>
      let model = match ch {
          Chat::Openai => config.openai_model.as_str(),
          Chat::Deepseek => config.deepseek_model.as_str(),
+         Chat::Grok => config.grok_model.as_str(),
          _ => "",
      };
 
@@ -113,7 +119,7 @@ pub fn ocr(conf: Arc<crate::config::Config>, content: &Vec<u8>) -> Result<String
     let rec_path = ocr_path.to_owned()+"ch_PP-OCRv4_rec_infer.onnx";
     
     let det = paddleocr_rs::Det::from_file(det_path.as_str())?;
-    let rec = paddleocr_rs::Rec::from_file(rec_path.as_str(),keys.as_str())?;
+    let rec = paddleocr_rs::Rec::from_file(rec_path.as_str(),keys.as_str())?.with_min_score(conf.rec_min_score.unwrap_or(0.8));
     let img = image::load_from_memory(content.as_slice())?;
 
     let mut res = String::from("");
