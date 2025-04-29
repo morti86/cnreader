@@ -140,7 +140,7 @@ impl Reader {
         let w = self.config.window.w;
         let lang = self.config.window.lang.as_str();
         let font_size = self.config.window.font_size;
-        let but_w = self.config.window.but_w.unwrap_or(80.0);
+        let but_w = self.config.window.but_w.unwrap_or(85.0);
 
         let idc_text: Element<'_, Message> = text_editor( &self.text )
             .placeholder("")
