@@ -107,7 +107,7 @@ macro_rules! report_err {
 
 // Get image from clipboard
 #[cfg(target_family="windows")]
-fn get_image() -> Vec<u8> {
+pub fn get_image() -> Vec<u8> {
     if let Ok(x) = get_clipboard(formats::Bitmap) {
         return x
     }
