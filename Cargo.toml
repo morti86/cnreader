@@ -1,26 +1,32 @@
 [package]
 name = "cnreader"
-version = "0.1.0"
-edition = "2021"
+version = "0.2.0"
+edition = "2024"
 
 [dependencies]
 regex = "1.11.*"
 serde = { version = "1.0.*", features=["derive"] }
-toml = "0.8.19"
+toml = "0.8.20"
 elevenlabs_rs = "0.3.2"
 anyhow = "1.0.*"
 rayon = "1.10.0"
-iced = { version = "0.13.1", features=["tokio"] }
+iced = { git = "https://github.com/iced-rs/iced/" , features=["tokio", "advanced","sipper","svg"] }
 deepl = "0.6.5"
 paddleocr_rs = "0.1.1"
 image = "0.25.*"
 rfd = "0.15.2"
-openai = "1.0.0-alpha.18"
-tokio = "^1.40.*"
+openai = "1.1.0"
+tokio = { version = "^1.40.*", features = ["full"] }
 rusqlite = { version = "0.33.0", features=["bundled"] }
 chrono = "0.4.*"
 shellexpand = "3.1.0"
-ollama-rs = "0.2.4"
+ollama-rs = { version = "0.3.0", features = ["stream"] }
+tracing-subscriber = "0.3.19"
+tracing = "0.1.41"
+once_cell = "1.21.3"
+tokio-stream = "0.1.17"
+async-channel = "2.3.1"
+reqwest = { version = "0.12.15", features = ["json", "stream"] }
 
 [target.'cfg(target_family = "unix")'.dependencies]
 wl-clipboard-rs = "*"
