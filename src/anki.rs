@@ -1,6 +1,7 @@
 use rusqlite::Connection;
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
+use tracing::{debug,info};
 
 type Dupa<T> = Result<T, Box<dyn std::error::Error>>;
 
@@ -19,7 +20,7 @@ impl Anki {
             let mut st = c.prepare("SELECT REPLACE(sfld, CHAR(10), ' '),id FROM notes").unwrap();
             let mut e_it = st.query([]).unwrap();
             let mut data = HashMap::new();
-            println!("AAA");
+            debug!("Loading Anki");
             while let Ok(e) = e_it.next() {
                 if let Some(e) = e {
                     let word: String = e.get_unwrap(0);
@@ -32,6 +33,7 @@ impl Anki {
             }
             Self::AnkiDb { data }
         } else {
+            info!("Anki disabled");
             return Self::None
         }
 

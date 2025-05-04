@@ -1,126 +1,175 @@
 use openai::{
     chat::{ChatCompletion, ChatCompletionMessage, ChatCompletionMessageRole}, Credentials
 };
+use iced::task::{Never, Sipper, sipper};
 use std::sync::Arc;
 use deepl::DeepLApi;
 use anyhow::{Result, anyhow};
 use paddleocr_rs;
 use image;
+use tokio_stream::StreamExt;
 use elevenlabs_rs::*;
-use ollama_rs::{
-    generation::completion::request::GenerationRequest,
-    Ollama,
-};
+use ollama_rs::generation::completion::request::GenerationRequest;
+use crate::make_enum;
+use tracing::{debug, error, info};
+use tokio::sync::mpsc::error::TryRecvError;
 
-#[derive(Copy, Debug, Clone)]
-pub enum Question {
-    Meaning,
-    Examples,
+make_enum!(AiChat, [ChatGPT, Deepseek, Grok, Ollama]);
+
+pub struct ChatPrompt {
+    pub chat: AiChat,
+    pub prompt: String,
 }
 
-#[derive(Copy, Debug, Clone)]
-pub enum Chat {
-    Openai,
-    Deepseek,
-    Ollama,
-    Grok,
+#[derive(Debug, Clone)]
+pub enum Event {
+    MessageReceived(String),
+    Error(String),
+    End,
 }
 
-impl std::fmt::Display for Chat {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_str(match self {
-            Self::Openai => "Openai",
-            Self::Deepseek => "Deepseek",
-            Self::Ollama => "Ollama",
-            Self::Grok => "Grok",
-        })
+/// Return (URL, model, key)
+fn get_ai_conf(chat: &AiChat) -> Option<(&String, &String, &String)> {
+    let conf = crate::CONFIG.get().unwrap();
+    match chat {
+        AiChat::Grok => Some((&conf.grok, &conf.grok_model, &conf.api_keys.grok)),
+        AiChat::ChatGPT => Some((&conf.gpt, &conf.openai_model, &conf.api_keys.openai)),
+        AiChat::Deepseek => Some((&conf.deepseek, &conf.deepseek_model, &conf.api_keys.deepseek)),
+        _ => {
+            error!("Invalid AI configuration, it shouldn'e even be here");
+            None
+        }
     }
 }
 
-impl Chat {
-    pub const ALL: &'static [Self] = &[Self::Openai, Self::Deepseek, Self::Ollama, Self::Grok];
+pub fn connect() -> impl Sipper<Never, Event> {
+    sipper(async |mut output| {
+        loop {
+            let recv = crate::RECV.wait();
+            // Receive prompt (pressed ask chat button)
+            if let Ok(prompt) = recv.recv().await {
+                info!("Received prompt");
+                match prompt.chat {
+                    AiChat::Ollama => {
+                        info!("Ollama");
+                        let model = crate::CONFIG.get().unwrap().ollama_model.clone();
+                        let prompt = prompt.prompt;
+                        debug!("Prompt: {}", prompt);
+                        let request = GenerationRequest::new(model, prompt.as_str());
+                        let ollama = crate::OLLAMA.lock().await;
+                        let mut stream = ollama.generate_stream(request).await.unwrap();
+                        while let Some(res) = stream.next().await {
+                            match res {
+                                Ok(responses) => {
+                                    for r in responses {
+                                        let content = &r.response;
+                                        debug!("Received chat: {}", content);
+                                        output.send(Event::MessageReceived(content.clone())).await;
+                                    }
+                                }
+                                Err(e) => {
+                                    error!("Error sending: {}", e.to_string());
+                                    output.send(Event::Error(e.to_string())).await;
+                                }
+                            }
+                        }
+                    }
+                    _ => {
+                        let ai_chat = prompt.chat;
+                        info!("Ai: {}", ai_chat);
+                        if let Some((url, model, key)) = get_ai_conf(&ai_chat) {
+                            let prompt = prompt.prompt;
+                            debug!("Prompt: {}", prompt);
+                            debug!("Key {}", key);
+
+                            let c = Credentials::new(key, url);
+                            let messages = vec![ChatCompletionMessage {
+                                role: ChatCompletionMessageRole::User,
+                                content: Some(prompt),
+                                name: None,
+                                function_call: None,
+                                tool_calls: None,
+                                tool_call_id: None,
+                            }];
+                            let dur = std::time::Duration::from_millis(200);
+                            let cc = ChatCompletion::builder(model.as_str(), messages.clone())
+                                .credentials(c.clone())
+                                .stream(true)
+                                .create_stream()
+                                .await;
+
+                            match cc {
+                                Ok(mut cc) => {
+                                    
+                                    let mut d = true;
+                                    while d {
+                                        let r = cc.try_recv();
+                                        match r {
+                                            Ok(r) => {
+                                                debug!("Got OK");
+                                                let choice = &r.choices[0];
+                                                if let Some(content) = &choice.delta.content {
+                                                    debug!("Received chat content: {}", content);
+                                                    output.send(Event::MessageReceived(content.clone())).await;
+                                                }
+                                            }
+                                            Err(TryRecvError::Empty) => {
+                                                debug!("Empty stream");
+                                                tokio::time::sleep(dur).await;
+                                                debug!("Empty stream: awake");
+                                            }
+                                            Err(TryRecvError::Disconnected) => {
+                                                debug!("** DC **");
+                                                d = false;
+                                            }
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    error!("Error requesting: {}", e.to_string());
+                                    output.send(Event::Error(e.to_string())).await;
+                                }
+                            };
+
+                        } else {
+                            error!("Failed to get chat configuration");
+                        }
+                        
+                    }
+                }
+                debug!("Finished streaming");
+                output.send(Event::End).await;
+            } else {
+                error!("Error getting prompt");
+            }
+        }
+    })
 }
 
-// Sends a request to Chat GPT/Deepseek
-pub async fn ask_gpt_a(q: Question, ch: Chat, config: Arc<crate::config::Config>, w: Arc<String>) -> String {
-    let key = match ch {
-        Chat::Openai => config.api_keys.openai.as_str(),
-        Chat::Deepseek => config.api_keys.deepseek.as_str(),
-        Chat::Ollama => "",
-        Chat::Grok => config.api_keys.grok.as_str(),
-        };
-    let url = match ch { Chat::Openai => config.gpt.as_str(), Chat::Deepseek => config.deepseek.as_str(), Chat::Grok => config.grok.as_str(), _ => "" };
-    let c = Credentials::new(key, url);
-    let question = match q {
-        Question::Meaning => config.questions.meaning.get( config.window.lang.as_str() ).unwrap().as_str(),
-        Question::Examples => config.questions.examples.get( config.window.lang.as_str() ).unwrap().as_str(),
-    };
-    let messages = vec![ChatCompletionMessage {
-         role: ChatCompletionMessageRole::User,
-         content: Some(question.to_string()+w.as_str()),
-         name: None,
-         function_call: None,
-         tool_calls: vec![],
-         tool_call_id: None,
-     }];
+//------- DEEPL --------------
 
-     let model = match ch {
-         Chat::Openai => config.openai_model.as_str(),
-         Chat::Deepseek => config.deepseek_model.as_str(),
-         Chat::Grok => config.grok_model.as_str(),
-         _ => "",
-     };
-
-     let chat_completion = ChatCompletion::builder(model, messages.clone())
-         .credentials(c.clone())
-         .create()
-         .await
-         .unwrap();
-     let returned_message = chat_completion.choices.first().unwrap().message.clone();
-     let content = returned_message.content.unwrap();
-
-     content
-
-}
-
-pub async fn ask_ollama(q: Question, config: Arc<crate::config::Config>, w: Arc<String>) -> String {
-    let ollama = Ollama::new(config.ollama_url.as_str(), config.ollama_port);
-    let question = match q {
-        Question::Meaning => config.questions.meaning.get( config.window.lang.as_str() ).unwrap().as_str(),
-        Question::Examples => config.questions.examples.get( config.window.lang.as_str() ).unwrap().as_str(),
-    };
-
-    let prompt = format!("{} {}", question, w.as_str());
-
-    let res = ollama.generate(GenerationRequest::new(config.ollama_model.to_owned(), prompt)).await;
-
-    match res {
-        Ok(res) => res.response,
-        Err(e) => e.to_string(),
-    }
-}
-
-pub async fn ask_deepl_a(question: Arc<String>, conf: Arc<crate::config::Config>) -> Result<deepl::TranslateTextResp, deepl::Error> {
-    let api = DeepLApi::with(conf.api_keys.deepl.as_str()).new();
-    let lang = conf.window.lang.as_str();
-    let lang = match lang {
-        "pol" => deepl::Lang::PL,
-        _ => deepl::Lang::EN_US,
-    };
-
-    let res = api.translate_text(question, lang).await;
+pub async fn ask_deepl_a(question: Arc<String>) -> Result<deepl::TranslateTextResp, deepl::Error> {
+    let key = crate::CONFIG.wait().api_keys.deepl.as_str();
+    let api = DeepLApi::with(key).new();
+    let res = api.translate_text(question, deepl::Lang::EN_US).await;
     res
 }
 
-pub fn ocr(conf: Arc<crate::config::Config>, content: &Vec<u8>) -> Result<String> {
-    let ocr_path = conf.ocr_models.as_str();
+//------- OCR -------------
+
+pub async fn ocr(content: &Vec<u8>) -> Result<String> {
+    debug!("Waiting for CONFIG");
+    let ocr_path = &crate::CONFIG.wait().ocr_models;
+    let rec_min_score = crate::CONFIG.get().unwrap().rec_min_score;
     let det_path = ocr_path.to_owned()+"ch_PP-OCRv4_det_infer.onnx";
     let keys = ocr_path.to_owned() + "ppocr_keys_v1.txt";
     let rec_path = ocr_path.to_owned()+"ch_PP-OCRv4_rec_infer.onnx";
     
+    debug!("Init OCR");
     let det = paddleocr_rs::Det::from_file(det_path.as_str())?;
-    let rec = paddleocr_rs::Rec::from_file(rec_path.as_str(),keys.as_str())?.with_min_score(conf.rec_min_score.unwrap_or(0.8));
+    let rec = paddleocr_rs::Rec::from_file(rec_path.as_str(),keys.as_str())?.with_min_score(rec_min_score.unwrap_or(0.8));
     let img = image::load_from_memory(content.as_slice())?;
+    debug!("Image loaded from memory");
 
     let mut res = String::from("");
     for sub in det.find_text_img(&img)? {
@@ -129,30 +178,38 @@ pub fn ocr(conf: Arc<crate::config::Config>, content: &Vec<u8>) -> Result<String
     Ok(res)
 }
 
-pub fn ocr_file(conf: Arc<crate::config::Config>, file_name: &std::path::PathBuf) -> Result<String> {
-    let ocr_path = conf.ocr_models.as_str();
+pub async fn ocr_file(file_name: &std::path::PathBuf) -> Result<String> {
+    let ocr_path = &crate::CONFIG.wait().ocr_models;
+    //let ocr_path = conf.ocr_models.as_str();
     let det_path = ocr_path.to_owned()+"ch_PP-OCRv4_det_infer.onnx";
     let keys = ocr_path.to_owned() + "ppocr_keys_v1.txt";
     let rec_path = ocr_path.to_owned()+"ch_PP-OCRv4_rec_infer.onnx";
+
+    debug!("Init OCR");
     let det = paddleocr_rs::Det::from_file(det_path.as_str())?;
     let rec = paddleocr_rs::Rec::from_file(rec_path.as_str(),keys.as_str())?;
     let img = image::ImageReader::open(file_name)?;
+    debug!("Image file opened");
 
     let mut res = String::new();
     let r = img.decode()?;
+    debug!("Decoded image");
     for sub in det.find_text_img(&r)? {
         res.push_str(rec.predict_str(&sub)?.as_str());
     }
     Ok(res)
 }
 
-pub async fn el_play(conf: Arc<crate::config::Config>, text: Arc<String>) -> Result<elevenlabs_rs::Bytes> {
-    let key = conf.api_keys.elevenlabs.as_str();
-    let voice = conf.voice.clone();
+pub async fn el_play(text: Arc<String>) -> Result<elevenlabs_rs::Bytes> {
+    debug!("Waiting for CONFIG");
+    let key = crate::CONFIG.wait().api_keys.elevenlabs.as_str();
+    let voice = crate::CONFIG.wait().voice.as_str();
+    debug!("Init client");
     let client = ElevenLabsClient::new(key);
     let body = TextToSpeechBody::new(text.as_str(), Model::ElevenMultilingualV2);
     let endpoint = TextToSpeech::new(voice, body);   
     let speech = client.hit(endpoint).await;
+    debug!("received speech");
     match speech {
         Ok(r) => Ok(r),
         Err(e) => Err(anyhow!(e.to_string())),

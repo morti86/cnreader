@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use elevenlabs_rs::PreMadeVoiceID;
 use std::collections::HashMap;
 
 type Label = HashMap<String, String>;
@@ -12,57 +11,6 @@ pub struct Keys {
     pub elevenlabs: String,
     pub grok: String,
 }
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize, Copy)]
-#[serde(remote = "PreMadeVoiceID")]
-pub enum PreMadeVoiceIDDef {
-    Adam,
-    Alice,
-    Antoni,
-    Arnold,
-    Bill,
-    Brian,
-    Callum,
-    Charlie,
-    Chris,
-    Clyde,
-    Daniel,
-    Dave,
-    Dorothy,
-    Drew,
-    Domi,
-    Eli,
-    Emily,
-    Ethan,
-    Fin,
-    Freya,
-    George,
-    Gigi,
-    Giovanni,
-    Glinda,
-    Grace,
-    Harry,
-    James,
-    Jessie,
-    Jeremy,
-    Joseph,
-    Josh,
-    Liam,
-    Lily,
-    Matilda,
-    Michael,
-    #[default]
-    Mimi,
-    Nicole,
-    Patrick,
-    Paul,
-    Rachel,
-    Sam,
-    Sarah,
-    Serena,
-    Thomas,
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Window {
     pub w: f32,
@@ -120,8 +68,7 @@ pub struct Config {
     pub ollama_model: String,
 
     pub questions: ChatQuestions,
-    #[serde(with = "PreMadeVoiceIDDef")]
-    pub voice: PreMadeVoiceID,
+    pub voice: String,
 
     pub rec_min_score: Option<f32>,
 }
