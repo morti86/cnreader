@@ -1,15 +1,17 @@
 ocr_models = "/mnt/var/models/"
 openai_model = "gpt-4"
 deepseek_model = "deepseek-chat"
+grok_model = ""
 
 deepseek = "https://api.deepseek.com"
 gpt = "https://api.openai.com/v1"
+grok = ""
 
 ollama_url = "http://localhost"
 ollama_port = 11434
 ollama_model = "deepseek-r1:32b"
 
-voice = "Mimi"
+voice = "VR6AewLTigWG4xSOukaG"
 
 # The location of Anki database
 anki = "~/.var/app/net.ankiweb.Anki/data/Anki2/User 1/collection.anki2"
@@ -18,6 +20,7 @@ anki = "~/.var/app/net.ankiweb.Anki/data/Anki2/User 1/collection.anki2"
 openai = ""
 deepl = ""
 elevenlabs = ""
+grok = ""
 deepseek = ""
 
 [window]
@@ -27,34 +30,13 @@ h = 800
 lang = "eng"
 font = "Source Han Serif CN"
 # Theme, available values are:
-# 	Light (default), Dark, Dracula, Nord, SolarizedLight, SolarizedDark, GruvboxLight, 
-#       GruvboxDark, CatppuccinLatte, CatppuccinFrappe, CatppuccinMacchiato, 
-#       CatppuccinMocha, TokyoNight, TokyoNightStorm, TokyoNightLight, KanagawaWave, 
-#       KanagawaDragon, KanagawaLotus, Moonfly, Nightfly, Oxocarbon, Ferra
+# 	Light (default), Dark, Dracula, Nord, Solarized Light, Solarized Dark, Gruvbox Light, 
+#       Gruvbox Dark, Catppuccin Latte, Catppuccin Frappe, Catppuccin Macchiato, 
+#       Catppuccin Mocha, Tokyo Night, Tokyo Night Storm, Tokyo Night Light, Kanagawa Wave, 
+#       Kanagawa Dragon, Kanagawa Lotus, Moonfly, Nightfly, Oxocarbon, Ferra
 theme = "Tokyo Night"
 padding = 10
 # Font size
 font_size = 18.0
 
-# Labels
 default = "-"
-ids_ocr = { pol = "OCR", eng = "OCR" }
-ids_ocr_file = { pol = "OCR Pliku", eng = "OCR File" }
-ids_gpt = { pol = "GPT", eng = "GPT" }
-ids_deepseek = { pol = "Deepseek", eng = "Deepseek" }
-ids_meaning = { pol = "Znaczenie", eng = "Meaning" }
-ids_examples = { pol = "Przykłady", eng = "Examples" }
-ids_deepl = { pol = "Deepl", eng = "Deepl" }
-ids_play = { pol = "Odtwarzaj", eng = "Play" }
-ids_to_sim = { pol = "Uproszczone", eng = "Simplified" }
-ids_anki = { pol = "Anki", eng = "Anki" }
-
-ids_s_openai_key = { pol = "Klucz API Openai", eng = "Openai API key" }
-
-er_no_word_sel = { pol = "Nie zaznaczono słowa", eng = "No word selected" }
-er_no_chat_sel = { pol = "Nie wybrano chatu", eng = "No chat selected" }
-er_no_file = { pol = "Nie znaleziono pliku", eng = "No file found" }
-
-[questions]
-meaning = { pol = "Wytłumacz znaczenie i użycie słowa: ", eng = "Explain the meaning and the usage of the word: " }
-examples = { pol = "Podaj kilka przykładowych zdań ze słowem: ", eng = "Give a few example sentences with the word: " }

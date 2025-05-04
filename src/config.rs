@@ -23,30 +23,6 @@ pub struct Window {
     pub theme: String,
     pub font: String,
     pub padding: u16,
-    // Labels
-    pub default: String,
-    pub ids_ocr: Label,
-    pub ids_ocr_file: Label,
-    pub ids_gpt: Label,
-    pub ids_deepseek: Label,
-    pub ids_meaning: Label,
-    pub ids_examples: Label,
-    pub ids_deepl: Label,
-    pub ids_play: Label,
-    pub ids_to_sim: Label,
-    pub ids_anki: Label,
-
-    pub ids_s_openai_key: Label,
-
-    pub er_no_word_sel: Label,
-    pub er_no_chat_sel: Label,
-    pub er_no_file: Label,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
-pub struct ChatQuestions {
-    pub meaning: Label,
-    pub examples: Label,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -67,7 +43,6 @@ pub struct Config {
     pub ollama_port: u16,
     pub ollama_model: String,
 
-    pub questions: ChatQuestions,
     pub voice: String,
 
     pub rec_min_score: Option<f32>,
