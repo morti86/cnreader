@@ -1,12 +1,17 @@
+# The path to OCR models (link in Readme)
 ocr_models = "/mnt/var/models/"
+
+# AI models to use
 openai_model = "gpt-4"
 deepseek_model = "deepseek-chat"
-grok_model = ""
+grok_model = "grok-3-beta"
 
+# AI Api 
 deepseek = "https://api.deepseek.com"
 gpt = "https://api.openai.com/v1"
-grok = ""
+grok = "https://api.x.ai/v1"
 
+# Local Ollama chat
 ollama_url = "http://localhost"
 ollama_port = 11434
 ollama_model = "deepseek-r1:32b"
@@ -16,6 +21,7 @@ voice = "VR6AewLTigWG4xSOukaG"
 # The location of Anki database
 anki = "~/.var/app/net.ankiweb.Anki/data/Anki2/User 1/collection.anki2"
 
+# Here add API keys for online chats
 [api_keys]
 openai = ""
 deepl = ""
