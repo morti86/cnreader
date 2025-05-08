@@ -1,5 +1,5 @@
 # The path to OCR models (link in Readme)
-ocr_models = "/mnt/var/models/"
+ocr_models = "models/"
 
 # AI models to use
 openai_model = "gpt-4"
