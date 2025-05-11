@@ -34,23 +34,17 @@ impl Anki {
             Self::AnkiDb { data }
         } else {
             info!("Anki disabled");
-            return Self::None
+            Self::None
         }
 
     }
 
     pub fn is_none(&self) -> bool {
-        match self {
-            Self::None => true,
-            _ => false,
-        }
+        matches!(self, Self::None)
     }
 
     pub fn is_db(&self) -> bool {
-        match self {
-            Self::AnkiDb{..} => true,
-            _ => false,
-        }
+        matches!(self, Self::AnkiDb {..})
     }
 
     pub fn contains(&self, key: &str) -> bool {

@@ -41,6 +41,7 @@ enum Message {
     ResultAction(text_editor::Action),
     AppendResult(String),
     AppendText(String),
+    SetTextWithCursor(String,i32),
     ChatStreamEvent(chat::Event),
     AskChat(ChatQuestions),
     AiSelected(chat::AiChat),
@@ -53,6 +54,8 @@ enum Message {
     ToSimplified,
     ShowAnki,
     Play,
+    SaveFile,
+    ReadFile,
 }
 
 struct Reader {
@@ -77,10 +80,11 @@ pub fn run(theme: &str) -> Result<(), iced::Error> {
     for e in iced::Theme::ALL {
 
         debug!("Run with theme {}", theme);
-        if theme.to_string() == e.to_string() {
+        if *theme.to_string() == e.to_string() {
             return iced::application(Reader::new, Reader::update, Reader::view)
                 .subscription(Reader::subscription)
                 .theme(|_| e.clone())
+                .title(Reader::title)
                 .run();
         }
     }
@@ -91,6 +95,7 @@ pub fn run(theme: &str) -> Result<(), iced::Error> {
 
 impl Reader {
     const FNAME: &'static str = "dict.db";
+    const SAVE: &'static str = "save";
 
     pub fn new() -> Self {
         let (chat_sx, chat_rx) = async_channel::unbounded();
@@ -151,6 +156,7 @@ impl Reader {
         let ocr_models = &CONFIG.get().unwrap().ocr_models;
         let is_deepl = !CONFIG.get().unwrap().api_keys.deepl.is_empty();
         let is_el = !CONFIG.get().unwrap().api_keys.elevenlabs.is_empty();
+        let save_exists = Path::new(Self::SAVE).exists();
 
         let idc_text: Element<'_, Message> = text_editor( &self.text )
             .placeholder("Paste text here")
@@ -192,7 +198,7 @@ impl Reader {
         let idc_anki: Button<Message> = match (&self.anki, is_sel) {
             (anki::Anki::AnkiDb{..},true) => button("Anki").width(but_w).on_press(Message::ShowAnki),
             _ => button("Anki").width(but_w),
-        };
+        }.width(55.0);
 
         let idc_el: Button<Message> = if is_el {
             button("Play").on_press(Message::Play)
@@ -200,7 +206,15 @@ impl Reader {
             button("Play")
         };
 
-        let buttons = row![idc_ocr, idc_ocr_file, idc_ai, idc_meaning, idc_examples, idc_synonyms, idc_deepl, idc_sim, idc_anki, idc_el]
+        let idc_read: Button<Message> = if save_exists {
+            button("Read").on_press(Message::ReadFile)
+        } else {
+            button("Read")
+        };
+
+        let idc_save: Button<Message> = button("Save").on_press(Message::SaveFile);
+
+        let buttons = row![idc_ocr, idc_ocr_file, idc_ai, idc_meaning, idc_examples, idc_synonyms, idc_deepl, idc_sim, idc_anki, idc_el, idc_read, idc_save]
             .height(h * 0.1)
             .spacing(5)
             .align_y(iced::Alignment::Center);
@@ -264,6 +278,15 @@ impl Reader {
                 self.text.perform( text_editor::Action::Edit(text_editor::Edit::Paste(Arc::new(r)) ) );
                 iced::Task::none()
             }
+            Message::SetTextWithCursor(r,c) => {
+                self.text = text_editor::Content::with_text(r.as_str());
+                debug!("Trying to move cursor to line {}", c);
+                self.text.perform( text_editor::Action::Scroll { lines: c });
+                for _i in 0..c {
+                    self.text.perform( text_editor::Action::Move( text_editor::Motion::Down )  );
+                }
+                iced::Task::none()
+            }
 
             Message::ChatStreamEvent(e) => {
                 match e {
@@ -280,9 +303,8 @@ impl Reader {
                 iced::Task::none()
             }
             Message::AiSelected(e) => {
-                //let c = self.text.cursor_position();
                 self.ai = Some(e);
-                self.text.perform( text_editor::Action::SelectWord );
+                
                 iced::Task::none()
             }
             Message::ShowError(e) => {
@@ -335,8 +357,7 @@ impl Reader {
                 self.text = text_editor::Content::with_text("");
                 let content = helper::get_image();
                 iced::Task::perform(async move {
-                    let r = chat::ocr(&content).await;
-                    r
+                    chat::ocr(&content).await
                 }, |e| {
                     match e {
                         Ok(e) => Message::AppendResult(e),
@@ -349,8 +370,8 @@ impl Reader {
                 let file = rfd::FileDialog::new()
                     .add_filter("image", &["png", "bmp", "jpg"])
                     .pick_file();
-                if file == None {
-                    return iced::Task::none()
+                if file.is_none() {
+                    return iced::Task::none();
                 }
 
                 let file = file.unwrap();
@@ -372,19 +393,19 @@ impl Reader {
                 self.result = text_editor::Content::with_text("");
                 let s = self.text.selection().unwrap_or( self.text.text() );
                 let sel = Arc::new(s);
-                return iced::Task::perform(chat::ask_deepl_a(sel),
+                iced::Task::perform(chat::ask_deepl_a(sel),
                     |e| {
                     match e {
                         Ok(e) => {
                             let r = e.translations.into_iter().map(|t| { t.text }).reduce(|a,b| format!("{}{}", a, b)).unwrap_or_default();
-                            return Message::AppendResult(r);
+                            Message::AppendResult(r)
                         }
                         Err(e) => {
                             error!("{}", e.to_string());
-                            return Message::ShowError(Arc::new(e.to_string()));
+                            Message::ShowError(Arc::new(e.to_string()))
                         }
                     }
-                });
+                })
             }
             Message::Play => {
                 let s = Arc::new(self.text.selection().unwrap_or(self.text.text()));
@@ -398,12 +419,40 @@ impl Reader {
                     match r {
                         Ok(r) => { 
                             let _ = elevenlabs_rs::utils::play(r);
-                            return Message::Void;
+                            Message::Void
                         },
                         Err(e) => {
-                            return Message::ShowError(Arc::new(e.to_string())) 
+                            Message::ShowError(Arc::new(e.to_string()))
                         },
                     }
+                })
+            }
+            Message::ReadFile => {
+                iced::Task::perform(async move {
+                    tokio::fs::read_to_string(Self::SAVE).await
+                }, |r| {
+                    match r {
+                        Ok(text) => {
+                            let text = text.split_once('|')
+                                .unwrap_or(("0",""));
+                            let c: i32 = text.0.parse().unwrap_or(0);
+                            Message::SetTextWithCursor(text.1.to_string(), c)
+                        }
+                        Err(e) => Message::ShowError(Arc::new(e.to_string())),
+                    }
+                })
+            }
+            Message::SaveFile => {
+                let cursor = self.text.cursor_position();
+                let text = format!("{}|{}", cursor.0, self.text.text() );
+                iced::Task::perform(async move {
+                    tokio::fs::write(Self::SAVE, text.as_bytes()).await
+                }, |r| {
+                    match r {
+                        Ok(_) => Message::Void,
+                        Err(e) => Message::ShowError(Arc::new(e.to_string())),
+                    }
+
                 })
             }
         }

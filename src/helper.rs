@@ -26,7 +26,7 @@ impl fmt::Display for ChatQuestions {
 impl ChatQuestions {
     pub fn to_prompt(&self, ai: &AiChat, w: &str) -> ChatPrompt {
         ChatPrompt {
-            chat: ai.clone(),
+            chat: *ai,
             prompt: format!("{} {}", self, w),
         }
     }
@@ -75,9 +75,9 @@ macro_rules! make_enum {
             }
         }
 
-        impl Into<$name> for String {
-            fn into(self) -> $name {
-                let s = self.as_str();
+        impl From<String> for $name {
+            fn from(s: String) -> Self {
+                let s = s.as_str();
                 match s {
                     stringify!($op1) => $name::$op1,
                     $(
@@ -85,6 +85,7 @@ macro_rules! make_enum {
                     )*
                         _ => $name::$op1,
                 }
+
             }
         }
 

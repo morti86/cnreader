@@ -17,7 +17,7 @@ pub struct Entry {
 impl Entry {
     pub fn from_row(r: &Row) -> Self {
         let sim: String = r.get_unwrap(0);
-        let chr = (&sim).chars().count() == 1;
+        let chr = sim.chars().count() == 1;
         Self {
             sim,
             tra: r.get_unwrap(1),
@@ -31,7 +31,7 @@ impl Entry {
 
 impl fmt::Display for Entry {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let hsk = if self.hsk.is_some() { format!("HSK{}", self.hsk.unwrap()) } else { format!("") };
+        let hsk = if self.hsk.is_some() { format!("HSK{}", self.hsk.unwrap()) } else { String::new() };
         write!(f, "- {} | {} [{}] {}\n- {}", self.sim, self.tra, self.pin, hsk, self.mea.replace("/","\n- "))
     }
 }

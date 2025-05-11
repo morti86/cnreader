@@ -5,8 +5,7 @@ use iced::task::{Never, Sipper, sipper};
 use std::sync::Arc;
 use deepl::DeepLApi;
 use anyhow::{Result, anyhow};
-use paddleocr_rs;
-use image;
+use paddleocr_rs::{Det, Rec};
 use tokio_stream::StreamExt;
 use elevenlabs_rs::*;
 use ollama_rs::generation::completion::request::GenerationRequest;
@@ -151,8 +150,7 @@ pub fn connect() -> impl Sipper<Never, Event> {
 pub async fn ask_deepl_a(question: Arc<String>) -> Result<deepl::TranslateTextResp, deepl::Error> {
     let key = crate::CONFIG.wait().api_keys.deepl.as_str();
     let api = DeepLApi::with(key).new();
-    let res = api.translate_text(question, deepl::Lang::EN_US).await;
-    res
+    api.translate_text(question, deepl::Lang::EN_US).await
 }
 
 //------- OCR -------------
@@ -166,8 +164,8 @@ pub async fn ocr(content: &Vec<u8>) -> Result<String> {
     let rec_path = ocr_path.to_owned()+"ch_PP-OCRv4_rec_infer.onnx";
     
     debug!("Init OCR");
-    let det = paddleocr_rs::Det::from_file(det_path.as_str())?;
-    let rec = paddleocr_rs::Rec::from_file(rec_path.as_str(),keys.as_str())?.with_min_score(rec_min_score.unwrap_or(0.8));
+    let det = Det::from_file(det_path.as_str())?;
+    let rec = Rec::from_file(rec_path.as_str(),keys.as_str())?.with_min_score(rec_min_score.unwrap_or(0.8));
     let img = image::load_from_memory(content.as_slice())?;
     debug!("Image loaded from memory");
 
@@ -186,8 +184,8 @@ pub async fn ocr_file(file_name: &std::path::PathBuf) -> Result<String> {
     let rec_path = ocr_path.to_owned()+"ch_PP-OCRv4_rec_infer.onnx";
 
     debug!("Init OCR");
-    let det = paddleocr_rs::Det::from_file(det_path.as_str())?;
-    let rec = paddleocr_rs::Rec::from_file(rec_path.as_str(),keys.as_str())?;
+    let det = Det::from_file(det_path.as_str())?;
+    let rec = Rec::from_file(rec_path.as_str(),keys.as_str())?;
     let img = image::ImageReader::open(file_name)?;
     debug!("Image file opened");
 
