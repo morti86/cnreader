@@ -1,3 +1,4 @@
+#![windows_subsystem = "windows"]
 #![allow(dead_code)]
 use tokio::sync::Mutex;
 use once_cell::sync::{Lazy, OnceCell};
@@ -5,7 +6,7 @@ use std::fs;
 use tracing::{debug, error, info};
 use std::sync::Arc;
 use iced::widget::{button, column, row, text_editor, Button, scrollable,
-text, stack, container, opaque, center, mouse_area, combo_box, ComboBox};
+text, container, combo_box, ComboBox};
 use iced::{Element, Subscription};
 use helper::ChatQuestions;
 use std::path::Path;
@@ -27,12 +28,6 @@ static RESULT: Lazy<Mutex<scrollable::Id>> = Lazy::new(|| {
 static RECV: OnceCell<async_channel::Receiver<chat::ChatPrompt>> = OnceCell::new();
 static CONFIG: OnceCell<config::Config> = OnceCell::new();
 
-static OLLAMA: Lazy<Mutex<ollama_rs::Ollama>> = Lazy::new(|| {
-    let url = CONFIG.get().unwrap().ollama_url.clone();
-    let port = CONFIG.get().unwrap().ollama_port;
-    Mutex::new( ollama_rs::Ollama::new(url, port) )
-});
-
 // Message
 
 #[derive(Debug, Clone)]
@@ -44,7 +39,7 @@ enum Message {
     SetTextWithCursor(String,i32),
     ChatStreamEvent(chat::Event),
     AskChat(ChatQuestions),
-    AiSelected(chat::AiChat),
+    AiSelected(String),
     ShowError(Arc<String>),
     Void,
     Ocr,
@@ -70,8 +65,8 @@ struct Reader {
 
     modal_text: String,
 
-    ai_states: combo_box::State<chat::AiChat>,
-    ai: Option<chat::AiChat>,
+    ai_states: combo_box::State<String>,
+    ai: Option<String>,
 
     anki: anki::Anki,
 }
@@ -115,6 +110,11 @@ impl Reader {
         debug!("Self-init");
 
         let cedict = cedict::Cedict::new(Self::FNAME).expect("Failed to load the dictionary");
+        let ai_chats = CONFIG.get().unwrap()
+            .ai_chats
+            .clone()
+            .into_keys()
+            .collect::<Vec<String>>();
         debug!("Cedict: {}", cedict.len());
         Self {
             text: text_editor::Content::new(),
@@ -128,7 +128,7 @@ impl Reader {
             modal_text: String::new(),
 
             ai: None,
-            ai_states: combo_box::State::new(chat::AiChat::ALL.to_vec()),
+            ai_states: combo_box::State::new(ai_chats),
 
             anki,
         }
@@ -161,7 +161,7 @@ impl Reader {
         let idc_text: Element<'_, Message> = text_editor( &self.text )
             .placeholder("Paste text here")
             .on_action(Message::EditAction)
-            .height(h*0.50)
+            .height(h*0.55)
             .size(font_size)
             .into();
 
@@ -184,11 +184,11 @@ impl Reader {
         let idc_result: Element<'_, Message> = text_editor( &self.result )
             .placeholder("")
             .on_action(Message::ResultAction)
-            .height(h*0.40)
+            .height(h*0.3)
             .size(font_size-3.0)
             .into();
 
-        let idc_ai: ComboBox<chat::AiChat, Message> = combo_box(&self.ai_states, "", self.ai.as_ref(), Message::AiSelected).width(100.0);
+        let idc_ai: ComboBox<String, Message> = combo_box(&self.ai_states, "", self.ai.as_ref(), Message::AiSelected).width(140.0);
 
         let idc_meaning: Button<Message> = if is_sel { button("Meaning").on_press(Message::AskChat(helper::ChatQuestions::MeaningWord)) } else { button("Meaning") }.width(but_w);
         let idc_examples: Button<Message> = if is_sel { button("Examples").on_press(Message::AskChat(helper::ChatQuestions::Example)) } else { button("Examples") }.width(but_w);
@@ -214,13 +214,19 @@ impl Reader {
 
         let idc_save: Button<Message> = button("Save").on_press(Message::SaveFile);
 
-        let buttons = row![idc_ocr, idc_ocr_file, idc_ai, idc_meaning, idc_examples, idc_synonyms, idc_deepl, idc_sim, idc_anki, idc_el, idc_read, idc_save]
-            .height(h * 0.1)
+        let up_buttons = row![ idc_deepl, idc_anki, idc_el, idc_sim ]
+            .height(h * 0.05)
+            .spacing(5)
+            .align_y(iced::Alignment::Center);
+
+        let buttons = row![idc_ocr, idc_ocr_file, idc_ai, idc_meaning, idc_examples, idc_synonyms, idc_read, idc_save]
+            .height(h * 0.05)
             .spacing(5)
             .align_y(iced::Alignment::Center);
 
         let controls = column![
-            idc_text, 
+            idc_text,
+            up_buttons,
             idc_result, 
             buttons
             ].align_x(iced::Alignment::Center);
@@ -326,7 +332,7 @@ impl Reader {
                 }
                 let w = w.unwrap();
 
-                if let Some(ai) = self.ai {
+                if let Some(ai) = &self.ai {
                     let prompt = q.to_prompt(&ai, w.as_str());
                     debug!("Prompt: {}", prompt.prompt);
                     let chat_sx = self.chat_sx.clone();
@@ -490,31 +496,4 @@ fn main() -> Result<(), iced::Error> {
     }
 
     run(theme.as_str())
-}
-
-// Alert window
-
-fn modal<'a, Message>(
-    base: impl Into<Element<'a, Message>>,
-    content: impl Into<Element<'a, Message>>,
-    on_blur: Message) -> Element<'a, Message> where Message: Clone + 'a {
-    stack![
-        base.into(),
-        opaque(
-            mouse_area(center(opaque(content)).style(|_theme| {
-                container::Style {
-                    background: Some(
-                                    iced::Color {
-                                        a: 0.8,
-                                        ..iced::Color::BLACK
-                                    }
-                                    .into(),
-                                ),
-                                ..container::Style::default()
-                }
-            }))
-            .on_press(on_blur)
-        )
-    ]
-    .into()
 }

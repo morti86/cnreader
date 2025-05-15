@@ -4,7 +4,7 @@ use wl_clipboard_rs::paste::{get_contents, ClipboardType, MimeType, Seat};
 use clipboard_win::{formats, get_clipboard};
 use std::io::Read;
 use std::fmt;
-use crate::chat::{AiChat, ChatPrompt};
+use crate::chat::ChatPrompt;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ChatQuestions {
@@ -24,9 +24,9 @@ impl fmt::Display for ChatQuestions {
 }
 
 impl ChatQuestions {
-    pub fn to_prompt(&self, ai: &AiChat, w: &str) -> ChatPrompt {
+    pub fn to_prompt(&self, ai: &str, w: &str) -> ChatPrompt {
         ChatPrompt {
-            chat: *ai,
+            chat_name: ai.to_string(),
             prompt: format!("{} {}", self, w),
         }
     }

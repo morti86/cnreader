@@ -3,6 +3,7 @@ use std::fmt;
 use crate::Dupa;
 use rayon::prelude::*;
 use tracing::debug;
+use std::collections::BTreeMap;
 
 #[derive(Clone, Debug)]
 pub struct Entry {
@@ -12,12 +13,14 @@ pub struct Entry {
     mea: String,
     hsk: Option<u32>,
     chr: bool,
+    idx: char,
 }
 
 impl Entry {
     pub fn from_row(r: &Row) -> Self {
         let sim: String = r.get_unwrap(0);
         let chr = sim.chars().count() == 1;
+        let idx = sim.chars().nth(0).unwrap_or('?');
         Self {
             sim,
             tra: r.get_unwrap(1),
@@ -25,7 +28,12 @@ impl Entry {
             mea: r.get_unwrap(3),
             hsk: r.get_unwrap(4),
             chr,
+            idx,
         }
+    }
+
+    pub fn index(&self) -> char {
+        self.idx
     }
 }
 
@@ -37,27 +45,41 @@ impl fmt::Display for Entry {
 }
 
 pub struct Cedict {
-    data: Vec<Entry>,
+    data_t: BTreeMap<char, Vec<Entry>>,
 }
 
 impl Cedict {
     pub fn new(fname: &str) -> Dupa<Self> {
         let conn = Connection::open_with_flags(fname, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
         let mut st = conn.prepare("SELECT * from Cedict")?;
-        let data = st.query_map([], |r|
-            Ok(Entry::from_row(r))
-            )?
-            .map(|e| e.unwrap())
-            .collect();
-        Ok(Self { data })
+        
+        let mut data_t: BTreeMap<char, Vec<Entry>> = BTreeMap::new();
+        let mut data_tr = st.query([])?;
+        while let Ok(next) = data_tr.next() {
+            if let Some(row) = next {
+                let e = Entry::from_row(row);
+                let k = e.index();
+                data_t.entry(k).or_default().push(e);
+            } else {
+                break;
+            }
+        }
+        Ok(Self { 
+            data_t,
+        })
     }
 
     pub fn characters(&self) -> Vec<&Entry> {
-        self.data.par_iter().filter(|e| e.chr).collect()
+        self.data_t.par_iter()
+            .map(|(_,v)| v.iter().filter(|&e| e.chr).collect())
+            .reduce(|| vec![], |a,b| ([a,b]).concat() )
     }
 
     fn characters_filtered(&self, s: &str) -> Vec<&Entry> {
-        self.data.par_iter().filter(|e| { e.chr && s.contains(e.tra.as_str()) }).collect()
+        self.data_t.par_iter()
+            .map(|(_,v)| v.iter().filter(|&e| e.chr && s.contains(e.sim.as_str()) ).collect())
+            .reduce(|| vec![], |a,b| ([a,b]).concat() )
+
     }
 
     /// Convert traditional to simplified
@@ -76,18 +98,24 @@ impl Cedict {
     }
 
     pub fn len(&self) -> usize {
-        self.data.len()
+        self.data_t.len()
     }
 
     /// Search all containing
     pub fn search(&self, s: &str) -> Vec<&Entry> {
-        self.data.par_iter().filter(|e| { e.sim.contains(s) || e.tra.contains(s) }).collect()
+        self.data_t.par_iter()
+            .map(|(_,v)| v.iter().filter(|&e| e.sim.contains(s)).collect() )
+            .reduce(|| vec![], |a,b| ([a,b]).concat() )
     }
 
     /// Search exact match
     pub fn find(&self, s: &str) -> Vec<&Entry> {
         debug!("find: {}", s);
-        self.data.par_iter().filter(|e| { e.sim.as_str() == s || e.tra.as_str() == s }).collect()
+        let c = s.chars().nth(0).unwrap();
+        let r = self.data_t.get(&c).unwrap();
+        r.iter()
+            .filter(|e| e.sim.as_str() == s)
+            .collect()
     }
 
 

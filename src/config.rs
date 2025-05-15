@@ -1,15 +1,12 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 
 type Label = HashMap<String, String>;
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Keys {
-    pub openai: String,
-    pub deepl: String,
-    pub deepseek: String,
     pub elevenlabs: String,
-    pub grok: String,
+    pub deepl: String,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Window {
@@ -26,25 +23,25 @@ pub struct Window {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
+pub struct AiChatConfiguration {
+    pub name: String,
+    pub key: String,
+    pub url: String,
+    pub model: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Config {
     pub ocr_models: String,
-    pub openai_model: String,
-    pub deepseek_model: String,
-    pub grok_model: String,
     pub api_keys: Keys,
     pub window: Window,
-
-    pub deepseek: String,
-    pub gpt: String,
     pub anki: String,
-    pub grok: String,
-
-    pub ollama_url: String,
-    pub ollama_port: u16,
-    pub ollama_model: String,
 
     pub voice: String,
+    pub sel_chat: String,
 
     pub rec_min_score: Option<f32>,
+
+    pub ai_chats: BTreeMap<String, AiChatConfiguration>,
 }
 
