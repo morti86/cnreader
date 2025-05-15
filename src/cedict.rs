@@ -77,7 +77,7 @@ impl Cedict {
 
     fn characters_filtered(&self, s: &str) -> Vec<&Entry> {
         self.data_t.par_iter()
-            .map(|(_,v)| v.iter().filter(|&e| e.chr && s.contains(e.sim.as_str()) ).collect())
+            .map(|(_,v)| v.iter().filter(|&e| e.chr && (s.contains(e.sim.as_str()) || s.contains(e.tra.as_str())) ).collect())
             .reduce(|| vec![], |a,b| ([a,b]).concat() )
 
     }
