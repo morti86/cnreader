@@ -174,7 +174,7 @@ impl Reader {
         }
 
         let idc_ocr: Button<Message> = if ocr_ex { button("OCR").on_press(Message::Ocr) } else { button("OCR") }; 
-        let idc_ocr_file: Button<Message> = if ocr_ex { button("OCR File").on_press(Message::OcrFile) } else { button("OCR") };
+        let idc_ocr_file: Button<Message> = if ocr_ex { button("OCR File").on_press(Message::OcrFile) } else { button("OCR File") };
         let idc_deepl: Button<Message> = if is_deepl && is_sel {
             button("Deepl").on_press(Message::Deepl)
         } else {

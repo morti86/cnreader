@@ -110,12 +110,17 @@ impl Cedict {
 
     /// Search exact match
     pub fn find(&self, s: &str) -> Vec<&Entry> {
+        if s.is_empty() {
+            return vec![];
+        }
         debug!("find: {}", s);
         let c = s.chars().nth(0).unwrap();
-        let r = self.data_t.get(&c).unwrap();
-        r.iter()
-            .filter(|e| e.sim.as_str() == s)
-            .collect()
+        if let Some(r) = self.data_t.get(&c) {
+            return r.iter()
+                .filter(|e| e.sim.as_str() == s)
+                .collect::<Vec<&Entry>>();
+        }
+        vec![]
     }
 
 
